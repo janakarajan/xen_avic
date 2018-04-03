@@ -301,6 +301,8 @@ enum VMEXIT_EXITCODE
     VMEXIT_MWAIT_CONDITIONAL= 140, /* 0x8c */
     VMEXIT_XSETBV           = 141, /* 0x8d */
     VMEXIT_NPF              = 1024, /* 0x400, nested paging fault */
+    VMEXIT_AVIC_INCOMP_IPI  = 1025, /* 0x401 */
+    VMEXIT_AVIC_NOACCEL     = 1026, /* 0x402 */
     VMEXIT_INVALID          =  -1
 };
 
@@ -515,6 +517,9 @@ struct svm_domain {
      */
     struct avic_logical_id_entry *avic_logical_id_table;
     struct page_info *avic_logical_id_table_pg;
+
+    u32 avic_dfr_mode;
+    spinlock_t avic_dfr_mode_lock;
 };
 
 struct arch_svm_struct {
@@ -550,6 +555,7 @@ struct arch_svm_struct {
     } osvw;
 
     union avic_physical_id_entry *avic_last_phy_id;
+    u32 avic_last_ldr;
 };
 
 struct vmcb_struct *alloc_vmcb(void);
