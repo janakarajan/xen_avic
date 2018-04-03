@@ -64,6 +64,16 @@
 #include <asm/monitor.h>
 #include <asm/xstate.h>
 
+static int parse_svm_param(const char *s);
+
+/*
+ * The 'svm' parameter en/dis-ables various SVM features.
+ * Optional comma separated value may contain:
+ *
+ *   avic - Enable SVM Advanced Virtual Interrupt Controller (AVIC)
+ */
+custom_param("svm", parse_svm_param);
+
 void svm_asm_do_resume(void);
 
 u32 svm_feature_flags;
@@ -89,6 +99,28 @@ static bool_t amd_erratum383_found __read_mostly;
 static uint64_t osvw_length, osvw_status;
 static DEFINE_SPINLOCK(osvw_lock);
 
+static int __init parse_svm_param(const char *s)
+{
+    char *ss;
+    int val;
+
+    do {
+        val = !!strncmp(s, "no-", 3);
+        if ( !val )
+            s += 3;
+
+        ss = strchr(s, ',');
+        if ( ss )
+            *ss = '\0';
+
+        if ( !strcmp(s, "avic") )
+            svm_avic = val;
+
+        s = ss + 1;
+    } while ( ss );
+
+    return 0;
+}
 /* Only crash the guest if the problem originates in kernel mode. */
 static void svm_crash_or_fault(struct vcpu *v)
 {
