@@ -500,6 +500,21 @@ struct vmcb_struct {
 };
 
 struct svm_domain {
+    /*
+     * This per-domain table is used by the hardware to locate
+     * the vAPIC backing page to be used to deliver interrupts
+     * based on the guest physical APIC ID.
+     */
+    union avic_physical_id_entry *avic_physical_id_table;
+    struct page_info *avic_physical_id_table_pg;
+
+    /*
+     * This per-domain table is used by the hardware to map
+     * logically addressed interrupt requests (w/ guest logical APIC id)
+     * to the guest physical APIC ID.
+     */
+    struct avic_logical_id_entry *avic_logical_id_table;
+    struct page_info *avic_logical_id_table_pg;
 };
 
 struct arch_svm_struct {
@@ -533,6 +548,8 @@ struct arch_svm_struct {
         u64 length;
         u64 status;
     } osvw;
+
+    union avic_physical_id_entry *avic_last_phy_id;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

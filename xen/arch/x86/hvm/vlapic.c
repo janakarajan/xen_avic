@@ -592,7 +592,7 @@ static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
                 "timer_divisor: %d", vlapic->hw.timer_divisor);
 }
 
-static uint32_t vlapic_read_aligned(const struct vlapic *vlapic,
+uint32_t vlapic_read_aligned(const struct vlapic *vlapic,
                                     unsigned int offset)
 {
     switch ( offset )
@@ -788,7 +788,7 @@ static void vlapic_update_timer(struct vlapic *vlapic, uint32_t lvtt,
     }
 }
 
-static void vlapic_reg_write(struct vcpu *v,
+void vlapic_reg_write(struct vcpu *v,
                              unsigned int offset, uint32_t val)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -1597,6 +1597,10 @@ int vlapic_init(struct vcpu *v)
 
     if (vlapic->regs_page == NULL)
     {
+        /*
+         * SVM AVIC depends on the vlapic->regs_page being a full
+         * page allocation as it is also used for vAPIC backing page.
+         */
         vlapic->regs_page = alloc_domheap_page(v->domain, MEMF_no_owner);
         if ( vlapic->regs_page == NULL )
         {
