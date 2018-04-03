@@ -38,6 +38,7 @@
 
 #define AVIC_UNACCEL_ACCESS_OFFSET_MASK    0xFF0
 
+#define IS_RUNNING_BIT        62
 /*
  * Note:
  * Currently, svm-avic mode is not supported with nested virtualization.
@@ -62,6 +63,54 @@ avic_get_physical_id_entry(struct svm_domain *d, unsigned int index)
         return NULL;
 
     return &d->avic_physical_id_table[index];
+}
+
+static void avic_vcpu_load(struct vcpu *v)
+{
+    unsigned long tmp;
+    struct arch_svm_struct *s = &v->arch.hvm_svm;
+    int h_phy_apic_id;
+    struct avic_physical_id_entry *entry = (struct avic_physical_id_entry *)&tmp;
+
+    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
+
+    /*
+     * Note: APIC ID = 0xff is used for broadcast.
+     *       APIC ID > 0xff is reserved.
+     */
+    h_phy_apic_id = cpu_data[v->processor].apicid;
+    ASSERT(h_phy_apic_id < AVIC_PHY_APIC_ID_MAX);
+
+    tmp = read_atomic((u64*)(s->avic_last_phy_id));
+    entry->host_phy_apic_id = h_phy_apic_id;
+    entry->is_running = 1;
+    write_atomic((u64*)(s->avic_last_phy_id), tmp);
+}
+
+static void avic_vcpu_unload(struct vcpu *v)
+{
+    struct arch_svm_struct *s = &v->arch.hvm_svm;
+
+    clear_bit(IS_RUNNING_BIT, (u64*)(s->avic_last_phy_id));
+}
+
+static void avic_vcpu_resume(struct vcpu *v)
+{
+    struct arch_svm_struct *s = &v->arch.hvm_svm;
+
+    ASSERT(svm_avic_vcpu_enabled(v));
+    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
+
+    set_bit(IS_RUNNING_BIT, (u64*)(s->avic_last_phy_id));
+}
+
+static void avic_vcpu_block(struct vcpu *v)
+{
+    struct arch_svm_struct *s = &v->arch.hvm_svm;
+
+    ASSERT(svm_avic_vcpu_enabled(v));
+
+    clear_bit(IS_RUNNING_BIT, (u64*)(s->avic_last_phy_id));
 }
 
 int svm_avic_dom_init(struct domain *d)
@@ -106,6 +155,11 @@ int svm_avic_dom_init(struct domain *d)
     d->arch.hvm_domain.svm.avic_physical_id_table = __map_domain_page_global(pg);
 
     spin_lock_init(&d->arch.hvm_domain.svm.avic_dfr_mode_lock);
+
+    d->arch.hvm_domain.pi_ops.switch_from = avic_vcpu_unload;
+    d->arch.hvm_domain.pi_ops.switch_to = avic_vcpu_load;
+    d->arch.hvm_domain.pi_ops.vcpu_block = avic_vcpu_block;
+    d->arch.hvm_domain.pi_ops.do_resume = avic_vcpu_resume;
 
     return ret;
  err_out:
