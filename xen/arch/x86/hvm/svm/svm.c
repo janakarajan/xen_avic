@@ -1144,7 +1144,8 @@ static void noreturn svm_do_resume(struct vcpu *v)
         hvm_asid_flush_vcpu(v);
     }
 
-    if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) )
+    if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) &&
+         !svm_avic_vcpu_enabled(v) )
     {
         vintr_t intr;
 
@@ -1708,6 +1709,9 @@ const struct hvm_function_table * __init start_svm(void)
 
     if ( !cpu_has_svm_avic )
         svm_avic = 0;
+
+    if ( svm_avic )
+        svm_function_table.deliver_posted_intr  = svm_avic_deliver_posted_intr;
 
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
@@ -2552,7 +2556,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
      * NB. We need to preserve the low bits of the TPR to make checked builds
      * of Windows work, even though they don't actually do anything.
      */
-    if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) )
+    if ( !vcpu_guestmode && !vlapic_hw_disabled(vlapic) &&
+         !svm_avic_vcpu_enabled(v) )
     {
         intr = vmcb_get_vintr(vmcb);
         vlapic_set_reg(vlapic, APIC_TASKPRI,
@@ -2758,6 +2763,12 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_VINTR: {
         u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
         intr = vmcb_get_vintr(vmcb);
+
+        if ( svm_avic_vcpu_enabled(v) )
+        {
+            gdprintk(XENLOG_ERR, "AVIC VINTR:\n");
+            domain_crash(v->domain);
+        }
 
         intr.fields.irq = 0;
         general1_intercepts &= ~GENERAL1_INTERCEPT_VINTR;
