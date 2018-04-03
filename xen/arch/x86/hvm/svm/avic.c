@@ -28,6 +28,7 @@
 #include <asm/hvm/support.h>
 #include <asm/hvm/svm/avic.h>
 #include <asm/hvm/vlapic.h>
+#include <xen/keyhandler.h>
 #include <asm/p2m.h>
 #include <asm/page.h>
 
@@ -46,6 +47,11 @@
  * is in-place, this should be enabled by default.
  */
 bool svm_avic = false;
+
+static inline bool svm_is_avic_domain(struct domain *d)
+{
+    return ( d->arch.hvm_domain.svm.avic_physical_id_table != 0 );
+}
 
 static union avic_physical_id_entry*
 avic_get_physical_id_entry(struct svm_domain *d, unsigned int index)
@@ -254,6 +260,8 @@ void svm_avic_vmexit_do_incomp_ipi(struct cpu_user_regs *regs)
     u32 icrl = vmcb->exitinfo1;
     u32 id = vmcb->exitinfo2 >> 32;
     u32 index = vmcb->exitinfo2 && 0xFF;
+
+    curr->arch.hvm_svm.cnt_avic_incomp_ipi++;
 
     switch ( id )
     {
@@ -501,6 +509,8 @@ void svm_avic_vmexit_do_noaccel(struct cpu_user_regs *regs)
     u32 offset = vmcb->exitinfo1 & 0xFF0;
     u32 rw = (vmcb->exitinfo1 >> 32) & 0x1;
 
+    curr->arch.hvm_svm.cnt_avic_noaccel++;
+
     if ( avic_is_trap(offset) )
     {
         /* Handling AVIC Trap (intercept right after the access). */
@@ -548,14 +558,60 @@ void svm_avic_deliver_posted_intr(struct vcpu *v, u8 vec)
     if ( vlapic_test_and_set_vector(vec, &vlapic->regs->data[APIC_IRR]) )
         return;
 
+    v->arch.hvm_svm.cnt_avic_post_intr++;
     /*
      * If vcpu is running on another cpu, hit the doorbell to signal
      * it to process interrupt. Otherwise, kick it.
      */
     if ( v->is_running && (v != current) )
+    {
         wrmsrl(MSR_AMD_AVIC_DOORBELL, cpu_data[v->processor].apicid);
-    else
+        v->arch.hvm_svm.cnt_avic_doorbell++;
+    }
+    else {
         vcpu_kick(v);
+    }
+}
+
+static void avic_dump(unsigned char ch)
+{
+    struct domain *d;
+    struct vcpu *v;
+
+    printk("*********** SVM AVIC Statistics **************\n");
+
+    rcu_read_lock(&domlist_read_lock);
+
+    for_each_domain ( d )
+    {
+        if ( !svm_is_avic_domain(d) )
+            continue;
+
+        printk(">>> Domain %d <<<\n", d->domain_id);
+        for_each_vcpu ( d, v )
+        {
+            printk("\tVCPU %d\n", v->vcpu_id);
+            printk("\t* incomp_ipi = %u\n",
+                   v->arch.hvm_svm.cnt_avic_incomp_ipi);
+            printk("\t* noaccel    = %u\n",
+                   v->arch.hvm_svm.cnt_avic_noaccel);
+            printk("\t* post_intr  = %u\n",
+                   v->arch.hvm_svm.cnt_avic_post_intr);
+            printk("\t* doorbell   = %u\n",
+                   v->arch.hvm_svm.cnt_avic_doorbell);
+        }
+    }
+
+    rcu_read_unlock(&domlist_read_lock);
+
+    printk("**************************************\n");
+
+}
+
+void __init setup_avic_dump(void)
+{
+    if ( svm_avic )
+        register_keyhandler('j', avic_dump, "dump SVM AVIC stats", 1);
 }
 
 /*
