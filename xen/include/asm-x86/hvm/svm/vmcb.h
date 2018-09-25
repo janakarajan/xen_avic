@@ -21,6 +21,7 @@
 
 #include <xen/types.h>
 #include <asm/hvm/emulate.h>
+#include <asm/hvm/svm/avic.h>
 
 
 /* general 1 intercepts */
@@ -508,6 +509,21 @@ struct svm_domain {
             uint64_t status;
         };
     } osvw;
+
+    /*
+     * This per-domain table is used by the hardware to locate
+     * the vAPIC backing page to be used to deliver interrupts
+     * based on the guest physical APIC ID.
+     */
+    avic_physical_id_entry_t *avic_physical_id_table;
+
+    /*
+     * This per-domain table is used by the hardware to map
+     * logically addressed interrupt requests (w/ guest logical APIC id)
+     * to the guest physical APIC ID.
+     */
+    avic_logical_id_entry_t *avic_logical_id_table;
+    void *avic_permission_page;
 };
 
 /*

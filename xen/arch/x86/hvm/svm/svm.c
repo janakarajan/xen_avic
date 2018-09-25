@@ -47,6 +47,7 @@
 #include <asm/hvm/svm/asid.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
+#include <asm/hvm/svm/avic.h>
 #include <asm/hvm/svm/emulate.h>
 #include <asm/hvm/svm/intr.h>
 #include <asm/hvm/svm/svmdebug.h>
@@ -1273,11 +1274,12 @@ static int svm_domain_initialise(struct domain *d)
 
     svm_guest_osvw_init(d);
 
-    return 0;
+    return svm_avic_dom_init(d);
 }
 
 static void svm_domain_destroy(struct domain *d)
 {
+    svm_avic_dom_destroy(d);
 }
 
 static int svm_vcpu_initialise(struct vcpu *v)
@@ -1696,6 +1698,9 @@ const struct hvm_function_table * __init start_svm(void)
     if ( cpu_has_tsc_ratio )
         svm_function_table.tsc_scaling.ratio_frac_bits = 32;
 
+    if ( !cpu_has_svm_avic )
+        svm_avic = 0;
+
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
     P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
@@ -1707,6 +1712,7 @@ const struct hvm_function_table * __init start_svm(void)
     P(cpu_has_pause_filter, "Pause-Intercept Filter");
     P(cpu_has_pause_thresh, "Pause-Intercept Filter Threshold");
     P(cpu_has_tsc_ratio, "TSC Rate MSR");
+    P(cpu_has_svm_avic, svm_avic ? "AVIC (enabled)" : "AVIC (disabled)");
 #undef P
 
     if ( !printed )

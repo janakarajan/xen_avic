@@ -27,6 +27,7 @@
 #include <asm/msr-index.h>
 #include <asm/p2m.h>
 #include <asm/hvm/support.h>
+#include <asm/hvm/svm/avic.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/svmdebug.h>
 
@@ -216,6 +217,8 @@ static int construct_vmcb(struct vcpu *v)
         if ( cpu_has_pause_thresh )
             vmcb->_pause_filter_thresh = SVM_PAUSETHRESH_INIT;
     }
+
+    svm_avic_init_vmcb(v);
 
     vmcb->cleanbits.bytes = 0;
 
