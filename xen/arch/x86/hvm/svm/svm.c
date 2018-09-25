@@ -1713,7 +1713,10 @@ const struct hvm_function_table * __init start_svm(void)
         svm_avic = 0;
 
     if ( svm_avic )
+    {
         svm_function_table.deliver_posted_intr  = svm_avic_deliver_posted_intr;
+        svm_function_table.virtual_intr_delivery_enabled = svm_avic;
+    }
 
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
