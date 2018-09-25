@@ -5,6 +5,12 @@
 
 #define IS_RUNNING_BIT 62
 
+/* Values for domains ->arch.hvm.pi_ops.flags */
+#define PI_CSW_FROM   (1u << 0)
+#define PI_CSW_TO     (1u << 1)
+#define PI_CSW_BLOCK  (1u << 2)
+#define PI_CSW_RESUME (1u << 3)
+
 enum avic_incmp_ipi_err_code {
     AVIC_INCMP_IPI_ERR_INVALID_INT_TYPE,
     AVIC_INCMP_IPI_ERR_TARGET_NOT_RUN,
@@ -43,5 +49,10 @@ int svm_avic_init_vmcb(struct vcpu *v);
 
 void svm_avic_vmexit_do_incomp_ipi(struct cpu_user_regs *regs);
 void svm_avic_vmexit_do_noaccel(struct cpu_user_regs *regs);
+
+void avic_vcpu_unload(struct vcpu *v);
+void avic_vcpu_load(struct vcpu *v);
+void avic_vcpu_block(struct vcpu *v);
+void avic_vcpu_resume(struct vcpu *v);
 
 #endif /* _SVM_AVIC_H_ */

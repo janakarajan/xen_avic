@@ -1093,6 +1093,10 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_tsc_ratio_save(v);
 
     svm_sync_vmcb(v, vmcb_needs_vmload);
+
+    if ( v->domain->arch.hvm.pi_ops.flags & PI_CSW_FROM )
+        avic_vcpu_unload(v);
+
     svm_vmload_pa(per_cpu(host_vmcb, cpu));
 
     /* Resume use of ISTs now that the host TR is reinstated. */
@@ -1123,6 +1127,9 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     vmcb->cleanbits.bytes = 0;
     svm_lwp_load(v);
     svm_tsc_ratio_load(v);
+
+    if ( v->domain->arch.hvm.pi_ops.flags & PI_CSW_TO )
+        avic_vcpu_load(v);
 
     if ( cpu_has_rdtscp )
         wrmsr_tsc_aux(hvm_msr_tsc_aux(v));
@@ -1170,6 +1177,9 @@ static void noreturn svm_do_resume(struct vcpu *v)
             (vlapic_get_reg(vlapic, APIC_TASKPRI) & 0xFF) >> 4;
         vmcb_set_vintr(vmcb, intr);
     }
+
+    if ( v->domain->arch.hvm.pi_ops.flags & PI_CSW_RESUME )
+        avic_vcpu_resume(v);
 
     hvm_do_resume(v);
 

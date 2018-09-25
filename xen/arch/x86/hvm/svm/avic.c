@@ -54,6 +54,63 @@ avic_get_physical_id_entry(const struct svm_domain *d, unsigned int index)
     return &d->avic_physical_id_table[index];
 }
 
+void avic_vcpu_load(struct vcpu *v)
+{
+    uint32_t apic_id = vlapic_get_reg(vcpu_vlapic(v), APIC_ID);
+    avic_physical_id_entry_t *entry;
+    unsigned int h_phy_apic_id;
+
+    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
+
+    /*
+     * Note: APIC ID = 0xff is used for broadcast.
+     *       APIC ID > 0xff is reserved.
+     */
+    h_phy_apic_id = cpu_data[v->processor].apicid;
+    ASSERT(h_phy_apic_id < AVIC_PHY_APIC_ID_MAX);
+
+    entry = avic_get_physical_id_entry(&v->domain->arch.hvm.svm,
+                                       GET_xAPIC_ID(apic_id));
+    entry->host_phy_apic_id = h_phy_apic_id;
+    smp_wmb();
+    set_bit(IS_RUNNING_BIT, &entry->raw);
+}
+
+void avic_vcpu_unload(struct vcpu *v)
+{
+    uint32_t apic_id = vlapic_get_reg(vcpu_vlapic(v), APIC_ID);
+    avic_physical_id_entry_t *entry;
+
+    entry = avic_get_physical_id_entry(&v->domain->arch.hvm.svm,
+                                       GET_xAPIC_ID(apic_id));
+    clear_bit(IS_RUNNING_BIT, &entry->raw);
+}
+
+void avic_vcpu_resume(struct vcpu *v)
+{
+    uint32_t apic_id = vlapic_get_reg(vcpu_vlapic(v), APIC_ID);
+    avic_physical_id_entry_t *entry;
+
+    ASSERT(svm_avic_vcpu_enabled(v));
+    ASSERT(!test_bit(_VPF_blocked, &v->pause_flags));
+
+    entry = avic_get_physical_id_entry(&v->domain->arch.hvm.svm,
+                                       GET_xAPIC_ID(apic_id));
+    set_bit(IS_RUNNING_BIT, &entry->raw);
+}
+
+void avic_vcpu_block(struct vcpu *v)
+{
+    uint32_t apic_id = vlapic_get_reg(vcpu_vlapic(v), APIC_ID);
+    avic_physical_id_entry_t *entry;
+
+    ASSERT(svm_avic_vcpu_enabled(v));
+
+    entry = avic_get_physical_id_entry(&v->domain->arch.hvm.svm,
+                                       GET_xAPIC_ID(apic_id));
+    clear_bit(IS_RUNNING_BIT, &entry->raw);
+}
+
 int svm_avic_dom_init(struct domain *d)
 {
     int ret = 0;
@@ -103,6 +160,11 @@ int svm_avic_dom_init(struct domain *d)
     d->arch.hvm.svm.avic_physical_id_table = __map_domain_page_global(pg);
 
     spin_lock_init(&d->arch.hvm.svm.avic_dfr_mode_lock);
+
+    d->arch.hvm.pi_ops.flags |= PI_CSW_FROM;
+    d->arch.hvm.pi_ops.flags |= PI_CSW_TO;
+    d->arch.hvm.pi_ops.flags |= PI_CSW_BLOCK;
+    d->arch.hvm.pi_ops.flags |= PI_CSW_RESUME;
 
     return ret;
  err_out:
