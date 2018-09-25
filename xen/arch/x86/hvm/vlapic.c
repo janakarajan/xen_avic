@@ -592,9 +592,10 @@ static void vlapic_set_tdcr(struct vlapic *vlapic, unsigned int val)
                 "timer_divisor: %d", vlapic->hw.timer_divisor);
 }
 
-static uint32_t vlapic_read_aligned(const struct vlapic *vlapic,
-                                    unsigned int offset)
+static uint32_t vlapic_reg_read(struct vcpu *v, unsigned int offset)
 {
+    struct vlapic *vlapic = vcpu_vlapic(v);
+
     switch ( offset )
     {
     case APIC_PROCPRI:
@@ -632,7 +633,7 @@ static int vlapic_mmio_read(struct vcpu *v, unsigned long address,
      */
     if ( (alignment + len) <= 4 && offset <= (APIC_TDCR + 3) )
     {
-        uint32_t reg = vlapic_read_aligned(vlapic, offset & ~0xf);
+        uint32_t reg = vlapic_reg_read(v, offset & ~0xf);
 
         switch ( len )
         {
@@ -672,10 +673,10 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
         return X86EMUL_UNHANDLEABLE;
 
     if ( offset == APIC_ICR )
-        high = vlapic_read_aligned(vlapic, APIC_ICR2);
+        high = vlapic_reg_read(v, APIC_ICR2);
 
     *msr_content = ((uint64_t)high << 32) |
-                   vlapic_read_aligned(vlapic, offset);
+                   vlapic_reg_read(v, offset);
 
     return X86EMUL_OKAY;
 }
@@ -914,7 +915,7 @@ static int vlapic_mmio_write(struct vcpu *v, unsigned long address,
     {
         if ( unlikely(len < 4) )
         {
-            uint32_t reg = vlapic_read_aligned(vlapic, offset);
+            uint32_t reg = vlapic_reg_read(v, offset);
 
             alignment *= 8;
 
