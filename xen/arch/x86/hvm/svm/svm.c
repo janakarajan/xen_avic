@@ -86,6 +86,35 @@ static bool_t amd_erratum383_found __read_mostly;
 static uint64_t osvw_length, osvw_status;
 static DEFINE_SPINLOCK(osvw_lock);
 
+static int __init parse_svm_param(const char *s)
+{
+    char *ss;
+    int val, ret = 0;
+
+    do {
+        ss = strchr(s, ',');
+        if ( ss )
+            ss = strchr(s, '\0');
+
+        if ( (val = parse_boolean("avic", s, ss)) >= 0)
+            svm_avic = val;
+        else
+            ret = -EINVAL;
+
+        s = ss + 1;
+    } while ( ss );
+
+    return ret;
+}
+
+/*
+ * The 'svm' parameter en/dis-ables various SVM features.
+ * Optional comma separated value may contain:
+ *
+ *   avic - Enable SVM Advanced Virtual Interrupt Controller (AVIC)
+ */
+custom_param("svm", parse_svm_param);
+
 /* Only crash the guest if the problem originates in kernel mode. */
 static void svm_crash_or_fault(struct vcpu *v)
 {

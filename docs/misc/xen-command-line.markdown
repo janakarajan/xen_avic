@@ -1933,6 +1933,22 @@ Irrespective of Xen's setting, the feature is virtualised for HVM guests to
 use.  By default, Xen will enable this mitigation on hardware believed to be
 vulnerable to L1TF.
 
+### svm
+> `= List of [ avic ]`
+
+> Sub-options:
+
+> All sub-options are of boolean kind and can be prefixed with `no-` to
+> effect the inverse meaning.
+
+> `avic`
+
+> Default: `false`
+
+>> This option enables Advanced Virtual Interrupt Controller (AVIC),
+>> which is an extension of AMD Secure Virtual Machine (SVM) to virtualize
+>> local APIC for guest VM.
+
 ### sync\_console
 > `= <boolean>`
 
