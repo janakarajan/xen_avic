@@ -55,4 +55,5 @@ void avic_vcpu_load(struct vcpu *v);
 void avic_vcpu_block(struct vcpu *v);
 void avic_vcpu_resume(struct vcpu *v);
 
+void svm_avic_deliver_posted_intr(struct vcpu *v, u8 vector);
 #endif /* _SVM_AVIC_H_ */
