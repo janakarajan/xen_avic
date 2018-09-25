@@ -574,6 +574,12 @@ struct svm_vcpu {
     uint32_t dr_mask[4];
 
     u32 avic_last_ldr;
+
+    /* AVIC Statistics */
+    u32 cnt_avic_incomp_ipi;
+    u32 cnt_avic_noaccel;
+    u32 cnt_avic_post_intr;
+    u32 cnt_avic_doorbell;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

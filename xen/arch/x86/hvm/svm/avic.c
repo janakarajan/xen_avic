@@ -36,6 +36,11 @@
  */
 bool svm_avic = false;
 
+static inline const bool svm_is_avic_domain(struct domain *d)
+{
+    return d->arch.hvm.svm.avic_physical_id_table != 0;
+}
+
 static avic_physical_id_entry_t*
 avic_get_physical_id_entry(const struct svm_domain *d, unsigned int index)
 {
@@ -263,6 +268,8 @@ void svm_avic_vmexit_do_incomp_ipi(struct cpu_user_regs *regs)
     uint32_t icrl = vmcb->exitinfo1;
     uint32_t id = vmcb->exitinfo2 >> 32;
     uint32_t index = vmcb->exitinfo2 && 0xFF;
+
+    curr->arch.hvm.svm.cnt_avic_incomp_ipi++;
 
     switch ( id )
     {
@@ -497,6 +504,8 @@ void svm_avic_vmexit_do_noaccel(struct cpu_user_regs *regs)
     struct hvm_emulate_ctxt ctx;
     int rc;
 
+    curr->arch.hvm.svm.cnt_avic_noaccel++;
+
     if ( avic_is_trap(offset) )
     {
         /* Handling AVIC Trap (intercept right after the access). */
@@ -555,14 +564,19 @@ void svm_avic_deliver_posted_intr(struct vcpu *v, u8 vec)
     if ( vlapic_test_and_set_vector(vec, &vlapic->regs->data[APIC_IRR]) )
         return;
 
+    v->arch.hvm.svm.cnt_avic_post_intr++;
     /*
      * If vcpu is running on another cpu, hit the doorbell to signal
      * it to process interrupt. Otherwise, kick it.
      */
     if ( v->is_running && (v != current) )
+    {
         wrmsrl(MSR_AMD_AVIC_DOORBELL, cpu_data[v->processor].apicid);
-    else
+        v->arch.hvm.svm.cnt_avic_doorbell++;
+    }
+    else {
         vcpu_kick(v);
+    }
 }
 
 /*

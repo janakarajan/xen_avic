@@ -290,6 +290,16 @@ static void vmcb_dump(unsigned char ch)
         {
             printk("\tVCPU %d\n", v->vcpu_id);
             svm_vmcb_dump("key_handler", v->arch.hvm.svm.vmcb);
+            printk("*** SVM AVIC Stats ***\n");
+            printk("\t* incomp_ipi = %u\n",
+                   v->arch.hvm.svm.cnt_avic_incomp_ipi);
+            printk("\t* noaccel   = %u\n",
+                   v->arch.hvm.svm.cnt_avic_noaccel);
+            printk("\t* post_intr = %u\n",
+                   v->arch.hvm.svm.cnt_avic_post_intr);
+            printk("\t* doorbell  = %u\n",
+                   v->arch.hvm.svm.cnt_avic_doorbell);
+            printk("**********************\n");
         }
     }
 
